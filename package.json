@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "shadcn": "^3.2.1"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0"
+  }
+}
