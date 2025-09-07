@@ -185,7 +185,8 @@ export const deletePlaygroundTeamSessionAPI = async (
 
 export const getFathomTasksAPI = async (
   baseUrl: string,
-  filter?: TaskFilter
+  filter?: TaskFilter,
+  signal?: AbortSignal
 ): Promise<TaskGroup[]> => {
   try {
     const params = new URLSearchParams()
@@ -198,7 +199,7 @@ export const getFathomTasksAPI = async (
     
     const url = `${APIRoutes.GetFathomTasks(baseUrl)}${params.toString() ? `?${params.toString()}` : ''}`
     
-    const response = await fetch(url, { method: 'GET' })
+    const response = await fetch(url, { method: 'GET', signal })
     
     if (!response.ok) {
       throw new Error(`Failed to fetch tasks: ${response.statusText}`)
@@ -208,6 +209,12 @@ export const getFathomTasksAPI = async (
     return data.taskGroups || []
     
   } catch (error) {
+    // Suppress UI noise for cancelled requests during debounced typing
+    const name = (error as any)?.name
+    if (name === 'AbortError') {
+      // Re-throw so callers can ignore without clearing data
+      throw error
+    }
     console.error('Error fetching Fathom tasks:', error)
     toast.error('Failed to load tasks from LUSID')
     throw error
