@@ -1,0 +1,33 @@
+/* 
+ * Self-hosted fonts for offline use
+ * 
+ * To complete the setup:
+ * 1. Download Geist font files from: https://vercel.com/font/geist
+ * 2. Download DM Mono font files from: https://fonts.google.com/specimen/DM+Mono
+ * 3. Place the .woff2 files in this directory
+ * 4. Uncomment and update the @font-face declarations below
+ */
+
+/*
+@font-face {
+  font-family: 'Geist';
+  src: url('./geist-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Mono';
+  src: url('./dm-mono-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+*/
+
+/* Current fallback setup uses system fonts */
+:root {
+  --font-geist-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-dm-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
