@@ -124,11 +124,14 @@ export function TaskGroupItem({ group }: TaskGroupItemProps) {
               
               <Button
                 size="sm"
-                variant={isGroupSelected ? "secondary" : "outline"}
-                className="text-xs px-3 shrink-0"
+                variant={isGroupSelected ? "ghost" : "outline"}
+                className={cn(
+                  "text-xs px-3 shrink-0",
+                  isGroupSelected && "text-muted-foreground hover:text-muted-foreground"
+                )}
                 onClick={handleGroupSelect}
               >
-                {isGroupSelected ? 'Selected' : 'Select Group'}
+                {isGroupSelected ? 'Deselect' : 'Select Group'}
               </Button>
             </div>
           </div>
