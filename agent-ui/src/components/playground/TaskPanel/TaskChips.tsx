@@ -1,6 +1,6 @@
 'use client'
 
-import { X, Database, TrendingUp } from 'lucide-react'
+import { X, Database, TrendingUp, Plus } from 'lucide-react'
 import { usePlaygroundStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,14 @@ export function TaskChips() {
   const { selectedTasks, removeSelectedTask, taskGroups } = usePlaygroundStore()
 
   if (selectedTasks.length === 0) {
-    return null
+    return (
+      <div className="px-1 py-0">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Plus className="h-3 w-4" />
+          <span className="text-sm">Select a task to add context</span>
+        </div>
+      </div>
+    )
   }
 
   // Group selected tasks by ultimate parent for better display
@@ -25,26 +32,11 @@ export function TaskChips() {
   }, {} as Record<string, typeof selectedTasks>)
 
   return (
-    <div className="border-t border-border/30 bg-background/50 p-3">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="text-xs font-medium text-muted-foreground">
-          Selected Tasks ({selectedTasks.length})
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-5 px-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => {
-            selectedTasks.forEach(task => removeSelectedTask(task.id))
-          }}
-        >
-          Clear all
-        </Button>
-      </div>
-      
-      <ScrollArea className="max-h-32">
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(groupedTasks).map(([ultimateParentId, tasks]) => {
+    <div className="px-2 py-0.5">
+      <div className="flex items-center justify-between gap-2">
+        <ScrollArea className="flex-1">
+          <div className="flex flex-wrap gap-2 pr-2">
+            {Object.entries(groupedTasks).map(([ultimateParentId, tasks]) => {
             const isGroup = tasks.length > 1
             const ultimateParent = tasks.find(t => t.id === ultimateParentId) || tasks[0]
             
@@ -71,9 +63,26 @@ export function TaskChips() {
                 />
               )
             }
-          })}
+            })}
+          </div>
+        </ScrollArea>
+        
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="text-xs font-medium text-muted-foreground">
+            Selected Tasks ({selectedTasks.length})
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              selectedTasks.forEach(task => removeSelectedTask(task.id))
+            }}
+          >
+            Clear all
+          </Button>
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

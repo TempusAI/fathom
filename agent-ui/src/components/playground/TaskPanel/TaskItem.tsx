@@ -109,7 +109,7 @@ export function TaskItem({ task, isChild = false }: TaskItemProps) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="text-xs text-red-600 dark:text-red-400 truncate cursor-help">
-                        Error: {errorMessage.substring(0, 60)}...
+                        Error: {String(errorMessage).substring(0, 60)}...
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-md">
