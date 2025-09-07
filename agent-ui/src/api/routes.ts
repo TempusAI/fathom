@@ -37,5 +37,9 @@ export const APIRoutes = {
     PlaygroundApiUrl: string,
     teamId: string,
     sessionId: string
-  ) => `${PlaygroundApiUrl}/v1/playground/teams/${teamId}/sessions/${sessionId}`
+  ) => `${PlaygroundApiUrl}/v1/playground/teams/${teamId}/sessions/${sessionId}`,
+
+  // Fathom API routes
+  GetFathomTasks: (baseUrl: string) => `${baseUrl}/fathom/tasks`,
+  GetFathomTask: (baseUrl: string, taskId: string) => `${baseUrl}/fathom/tasks/${taskId}`
 }
