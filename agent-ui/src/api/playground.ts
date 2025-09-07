@@ -9,6 +9,7 @@ import {
   ComboboxTeam,
   Team
 } from '@/types/playground'
+import { TaskGroup, TaskFilter } from '@/types/tasks'
 
 export const getPlaygroundAgentsAPI = async (
   endpoint: string
@@ -180,4 +181,35 @@ export const deletePlaygroundTeamSessionAPI = async (
     throw new Error(`Failed to delete team session: ${response.statusText}`)
   }
   return response
+}
+
+export const getFathomTasksAPI = async (
+  baseUrl: string,
+  filter?: TaskFilter
+): Promise<TaskGroup[]> => {
+  try {
+    const params = new URLSearchParams()
+    
+    if (filter?.dateFrom) params.append('dateFrom', filter.dateFrom)
+    if (filter?.dateTo) params.append('dateTo', filter.dateTo)
+    if (filter?.searchQuery) params.append('searchQuery', filter.searchQuery)
+    if (filter?.states?.length) params.append('states', filter.states.join(','))
+    if (filter?.correlationIds?.length) params.append('correlationIds', filter.correlationIds.join(','))
+    
+    const url = `${APIRoutes.GetFathomTasks(baseUrl)}${params.toString() ? `?${params.toString()}` : ''}`
+    
+    const response = await fetch(url, { method: 'GET' })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tasks: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.taskGroups || []
+    
+  } catch (error) {
+    console.error('Error fetching Fathom tasks:', error)
+    toast.error('Failed to load tasks from LUSID')
+    throw error
+  }
 }

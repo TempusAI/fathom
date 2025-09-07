@@ -1,27 +1,48 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePlaygroundStore } from '@/store'
-import { getMockTaskGroups } from '@/lib/mockTasks'
+import { getFathomTasksAPI } from '@/api/playground'
 import { DateFilter } from './DateFilter'
 import { BatchFilter } from './BatchFilter'
 import { TaskList } from './TaskList'
 import { SearchFilter } from './SearchFilter'
 import { Separator } from '@/components/ui/separator'
+import { toast } from 'sonner'
 
 export function TaskPanel() {
   const { 
     taskGroups, 
     setTaskGroups, 
     taskFilter,
-    isTaskPanelVisible 
+    isTaskPanelVisible,
+    selectedEndpoint 
   } = usePlaygroundStore()
 
-  // Load mock data on mount
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Load tasks from LUSID API
   useEffect(() => {
-    const mockGroups = getMockTaskGroups()
-    setTaskGroups(mockGroups)
-  }, [setTaskGroups])
+    const loadTasks = async () => {
+      if (!selectedEndpoint) return
+      
+      setIsLoading(true)
+      try {
+        // Use backend endpoint (port 8000) instead of playground endpoint
+        const backendUrl = selectedEndpoint.replace(':7777', ':8000')
+        const groups = await getFathomTasksAPI(backendUrl, taskFilter)
+        setTaskGroups(groups)
+      } catch (error) {
+        console.error('Failed to load tasks:', error)
+        // Error toast is already shown in getFathomTasksAPI
+        setTaskGroups([]) // Clear tasks on error
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadTasks()
+  }, [selectedEndpoint, taskFilter, setTaskGroups])
 
   if (!isTaskPanelVisible) {
     return null
@@ -126,7 +147,13 @@ export function TaskPanel() {
 
       {/* Task List */}
       <div className="flex-1 overflow-hidden">
-        <TaskList groups={filteredGroups} />
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-muted-foreground">Loading tasks...</div>
+          </div>
+        ) : (
+          <TaskList groups={filteredGroups} />
+        )}
       </div>
 
       {/* Footer */}
