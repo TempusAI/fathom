@@ -109,7 +109,7 @@ export function TaskItem({ task, isChild = false }: TaskItemProps) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="text-xs text-red-600 dark:text-red-400 truncate cursor-help">
-                        Error: {errorMessage.substring(0, 60)}...
+                        Error: {String(errorMessage).substring(0, 60)}...
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-md">
@@ -128,11 +128,14 @@ export function TaskItem({ task, isChild = false }: TaskItemProps) {
 
           <Button
             size="sm"
-            variant={isSelected ? "secondary" : "outline"}
-            className="text-xs px-2 shrink-0"
+            variant={isSelected ? "ghost" : "outline"}
+            className={cn(
+              "text-xs px-2 shrink-0",
+              isSelected && "text-muted-foreground hover:text-muted-foreground"
+            )}
             onClick={handleSelect}
           >
-            {isSelected ? 'Selected' : 'Select'}
+            {isSelected ? 'Deselect' : 'Select'}
           </Button>
         </div>
       </CardContent>

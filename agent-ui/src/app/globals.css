@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Self-hosted font variables - system fonts for offline use */
+:root {
+  --font-geist-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  --font-dm-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
 @layer base {
   :root {
     --color-border-default: 63, 63, 70;

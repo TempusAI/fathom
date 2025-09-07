@@ -36,22 +36,23 @@ export function DateFilter() {
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant={hasFilter ? "secondary" : "outline"}
+          variant="outline"
+          size="sm"
           className={cn(
             "w-full justify-start text-left font-normal",
             !selectedDate && "text-muted-foreground",
-            hasFilter && "border-primary/50 bg-primary/5"
+            hasFilter && "text-foreground bg-transparent border-border"
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {selectedDate ? (
-            format(selectedDate, "PPP")
+            format(selectedDate, "MMM d")
           ) : (
             <span>Filter by date</span>
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 bg-background border" align="start">
         <Calendar
           mode="single"
           selected={selectedDate}
