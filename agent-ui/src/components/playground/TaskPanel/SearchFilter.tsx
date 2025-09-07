@@ -23,7 +23,7 @@ export function SearchFilter() {
         placeholder="Search tasks, states, portfolios..."
         value={taskFilter.searchQuery || ''}
         onChange={(e) => handleSearchChange(e.target.value)}
-        className="pl-10 pr-10"
+        className="pl-10 pr-10 h-8"
       />
       {taskFilter.searchQuery && (
         <Button

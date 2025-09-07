@@ -82,6 +82,7 @@ export interface TaskFilter {
   dateTo?: string
   searchQuery?: string
   states?: TaskState[]
+  correlationIds?: string[]
 }
 
 // Store interface extension

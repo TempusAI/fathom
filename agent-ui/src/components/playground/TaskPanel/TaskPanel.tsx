@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePlaygroundStore } from '@/store'
 import { getMockTaskGroups } from '@/lib/mockTasks'
 import { DateFilter } from './DateFilter'
+import { BatchFilter } from './BatchFilter'
 import { TaskList } from './TaskList'
 import { SearchFilter } from './SearchFilter'
 import { Separator } from '@/components/ui/separator'
@@ -31,11 +32,21 @@ export function TaskPanel() {
     // Date filter
     if (taskFilter.dateFrom || taskFilter.dateTo) {
       const createdDate = new Date(group.ultimateParent.version.asAtCreated)
-      if (taskFilter.dateFrom && createdDate < new Date(taskFilter.dateFrom)) {
-        return false
+      const createdDateOnly = new Date(createdDate.getFullYear(), createdDate.getMonth(), createdDate.getDate())
+      
+      if (taskFilter.dateFrom) {
+        const filterFromDate = new Date(taskFilter.dateFrom)
+        const filterFromDateOnly = new Date(filterFromDate.getFullYear(), filterFromDate.getMonth(), filterFromDate.getDate())
+        if (createdDateOnly < filterFromDateOnly) {
+          return false
+        }
       }
-      if (taskFilter.dateTo && createdDate > new Date(taskFilter.dateTo)) {
-        return false
+      if (taskFilter.dateTo) {
+        const filterToDate = new Date(taskFilter.dateTo)
+        const filterToDateOnly = new Date(filterToDate.getFullYear(), filterToDate.getMonth(), filterToDate.getDate())
+        if (createdDateOnly > filterToDateOnly) {
+          return false
+        }
       }
     }
 
@@ -49,6 +60,21 @@ export function TaskPanel() {
         child.state.toLowerCase().includes(query)
       )
       if (!parentMatches && !childMatches) {
+        return false
+      }
+    }
+
+    // Batch filter (correlation IDs)
+    if (taskFilter.correlationIds && taskFilter.correlationIds.length > 0) {
+      const parentCorrelationIds = group.ultimateParent.correlationIds || []
+      const childCorrelationIds = group.children.flatMap(child => child.correlationIds || [])
+      const allCorrelationIds = [...parentCorrelationIds, ...childCorrelationIds]
+      
+      const hasMatchingCorrelation = taskFilter.correlationIds.some(filterId => 
+        allCorrelationIds.includes(filterId)
+      )
+      
+      if (!hasMatchingCorrelation) {
         return false
       }
     }
@@ -83,11 +109,16 @@ export function TaskPanel() {
         <Separator className="bg-border/30" />
         
         {/* Filters */}
-        <div className="flex gap-3">
-          <div className="flex-1">
-            <DateFilter />
+        <div className="flex justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-40">
+              <DateFilter />
+            </div>
+            <div className="w-44">
+              <BatchFilter />
+            </div>
           </div>
-          <div className="flex-1">
+          <div className="w-64">
             <SearchFilter />
           </div>
         </div>
