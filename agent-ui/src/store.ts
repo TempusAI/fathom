@@ -158,8 +158,7 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       // Task actions
       addSelectedTask: (task) =>
         set((state) => ({
-          selectedTasks: [...state.selectedTasks.filter(t => t.id !== task.id), task],
-          isTaskPanelVisible: false
+          selectedTasks: [...state.selectedTasks.filter(t => t.id !== task.id), task]
         })),
       removeSelectedTask: (taskId) =>
         set((state) => ({
@@ -174,8 +173,7 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
             ),
             group.ultimateParent,
             ...group.children
-          ],
-          isTaskPanelVisible: false
+          ]
         })),
       removeSelectedTaskGroup: (ultimateParentId) =>
         set((state) => {

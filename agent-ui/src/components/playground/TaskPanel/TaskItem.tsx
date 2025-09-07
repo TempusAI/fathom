@@ -128,11 +128,14 @@ export function TaskItem({ task, isChild = false }: TaskItemProps) {
 
           <Button
             size="sm"
-            variant={isSelected ? "secondary" : "outline"}
-            className="text-xs px-2 shrink-0"
+            variant={isSelected ? "ghost" : "outline"}
+            className={cn(
+              "text-xs px-2 shrink-0",
+              isSelected && "text-muted-foreground hover:text-muted-foreground"
+            )}
             onClick={handleSelect}
           >
-            {isSelected ? 'Selected' : 'Select'}
+            {isSelected ? 'Deselect' : 'Select'}
           </Button>
         </div>
       </CardContent>
