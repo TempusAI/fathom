@@ -6,7 +6,7 @@ import ScrollToBottom from '@/components/playground/ChatArea/ScrollToBottom'
 import { StickToBottom } from 'use-stick-to-bottom'
 
 const MessageArea = () => {
-  const { messages } = usePlaygroundStore()
+  const { messages, isTaskTrayOpen } = usePlaygroundStore()
 
   return (
     <StickToBottom
@@ -15,7 +15,7 @@ const MessageArea = () => {
       initial="smooth"
     >
       <StickToBottom.Content className="flex min-h-full flex-col justify-center">
-        <div className="mx-auto w-full max-w-5xl space-y-9 px-4 pb-4">
+        <div className={`mx-auto w-full max-w-5xl space-y-9 px-4 pb-4 ${isTaskTrayOpen ? 'pt-2' : ''}`}>
           <Messages messages={messages} />
         </div>
       </StickToBottom.Content>

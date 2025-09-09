@@ -159,7 +159,16 @@ const Messages = ({ messages }: MessageListProps) => {
   const { isTaskPanelVisible } = usePlaygroundStore()
   
   if (messages.length === 0 && isTaskPanelVisible) {
-    return <TaskPanel />
+    return (
+      <div
+        className="mx-auto w-full max-w-5xl px-4 flex items-center justify-center pt-10 md:pt-16"
+        style={{ minHeight: 'calc(100vh - 380px)' }}
+      >
+        <div className="mx-auto w-full" style={{ height: 380 }}>
+          <TaskPanel showHeader={false} className="h-full" />
+        </div>
+      </div>
+    )
   }
   
   if (messages.length === 0) {

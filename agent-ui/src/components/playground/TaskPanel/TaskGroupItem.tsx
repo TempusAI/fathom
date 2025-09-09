@@ -138,8 +138,8 @@ export function TaskGroupItem({ group }: TaskGroupItemProps) {
 
           {/* Child Tasks */}
           {children.length > 0 && (
-            <CollapsibleContent className="space-y-2 mt-3 pl-6">
-              <div className="border-l-2 border-border/20 pl-4 space-y-2">
+            <CollapsibleContent className="space-y-2 mt-3">
+              <div className="space-y-2">
                 {children.map((child) => (
                   <TaskItem key={child.id} task={child} isChild />
                 ))}
