@@ -70,7 +70,7 @@ export function TaskItem({ task, isChild = false }: TaskItemProps) {
 
   return (
     <CardComponent className={cn(
-      isChild ? "border border-border/20 rounded-md" : "",
+      isChild ? "border border-border/20 rounded-md bg-background/40" : "",
       "transition-all duration-200 hover:shadow-sm",
       isSelected && "ring-1 ring-primary/30 bg-primary/5"
     )}>
