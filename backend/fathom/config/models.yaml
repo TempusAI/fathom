@@ -1,0 +1,8 @@
+models:
+  gpt-4o-azure:
+    provider: azure_openai
+    deployment_env: AZURE_OPENAI_DEPLOYMENT
+    default_deployment: gpt-4o
+    api_version_env: AZURE_OPENAI_API_VERSION
+    default_api_version: 2024-12-01-preview
+
