@@ -127,8 +127,18 @@ class AzureOpenAIClient:
             "Content-Type": "application/json",
         }
 
-    async def chat(self, messages: List[Dict[str, Any]], temperature: float = 0.2) -> Dict[str, Any]:
-        payload = {"messages": messages, "temperature": temperature}
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.2,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"messages": messages, "temperature": temperature}
+        if tools:
+            payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
         headers = await self._get_headers()
         close_session = False
         session = self._session
@@ -143,8 +153,18 @@ class AzureOpenAIClient:
             if close_session:
                 await session.close()
 
-    async def stream_chat(self, messages: List[Dict[str, Any]], temperature: float = 0.2) -> AsyncGenerator[Dict[str, Any], None]:
-        payload = {"messages": messages, "temperature": temperature}
+    async def stream_chat(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.2,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        payload: Dict[str, Any] = {"messages": messages, "temperature": temperature}
+        if tools:
+            payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
         headers = await self._get_headers()
         close_session = False
         session = self._session

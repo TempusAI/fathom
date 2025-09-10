@@ -13,6 +13,8 @@ from fathom.clients.azure_openai_client import (
     AzureOpenAIClient,
     load_azure_openai_config,
 )
+from fathom.tools.registry import get_tool_definitions, execute_tool_call, build_tool_cheat_sheet
+import lusid
 
 
 router = APIRouter()
@@ -85,14 +87,103 @@ async def _stream_run_from_azure(messages: List[Dict[str, Any]]) -> AsyncGenerat
     }
     yield json.dumps(start_obj).encode() + b"\n"
 
+    # Prepare tool registry and hidden system context
+    tools = get_tool_definitions()
+    cheat_sheet = build_tool_cheat_sheet()
+    system_msg = {"role": "system", "content": cheat_sheet}
+    convo: List[Dict[str, Any]] = [system_msg] + messages
+
     accumulated = ""
     try:
-        async for chunk in client.stream_chat(messages=messages, temperature=0.2):
+        async for chunk in client.stream_chat(messages=convo, temperature=0.2, tools=tools, tool_choice="auto"):
             try:
                 choices = chunk.get("choices", [])
                 if not choices:
                     continue
                 delta = choices[0].get("delta") or {}
+
+                # Tool calls in stream (Azure style) can appear as tool_calls list on message
+                tool_calls = delta.get("tool_calls") or []
+                if tool_calls:
+                    # For each tool call, execute synchronously and push tool message into convo; then continue
+                    for call in tool_calls:
+                        tool_call_id = call.get("id") or str(uuid.uuid4())
+                        fn = (call.get("function") or {})
+                        name = fn.get("name")
+                        raw_args = fn.get("arguments") or "{}"
+                        try:
+                            args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                        except Exception:
+                            args = {}
+
+                        # Emit tool start
+                        start_evt = {
+                            "event": "RunToolCallStarted",
+                            "tool_name": name,
+                            "tool_call_id": tool_call_id,
+                            "created_at": _now_epoch(),
+                        }
+                        yield json.dumps(start_evt).encode() + b"\n"
+
+                        # Execute tool
+                        from main import app
+                        api_factory: lusid.ApiClientFactory | None = getattr(app.state, "lusid_factory", None)
+                        try:
+                            result = execute_tool_call(api_factory, name=name, arguments=args)
+                            tool_msg = {
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "name": name,
+                                "content": json.dumps(result),
+                            }
+                            convo.append(tool_msg)
+
+                            # Emit tool completed with compact content
+                            done_evt = {
+                                "event": "RunToolCallCompleted",
+                                "tool_name": name,
+                                "tool_call_id": tool_call_id,
+                                "created_at": _now_epoch(),
+                                "content": result,
+                            }
+                            yield json.dumps(done_evt).encode() + b"\n"
+                        except Exception as te:
+                            err_payload = {"error": str(te)}
+                            tool_msg = {
+                                "role": "tool",
+                                "tool_call_id": tool_call_id,
+                                "name": name,
+                                "content": json.dumps(err_payload),
+                            }
+                            convo.append(tool_msg)
+                            err_evt = {
+                                "event": "RunToolCallCompleted",
+                                "tool_name": name,
+                                "tool_call_id": tool_call_id,
+                                "created_at": _now_epoch(),
+                                "content": err_payload,
+                            }
+                            yield json.dumps(err_evt).encode() + b"\n"
+
+                    # After handling tool calls, immediately trigger a non-stream assistant turn to integrate tool results
+                    try:
+                        follow = await client.chat(messages=convo, temperature=0.2, tools=tools, tool_choice="auto")
+                        text = ((follow.get("choices") or [{}])[0].get("message", {}) or {}).get("content")
+                        if text:
+                            accumulated += text
+                            content_obj = {
+                                "event": "RunResponseContent",
+                                "content_type": "text/markdown",
+                                "content": accumulated,
+                                "model": model_alias,
+                                "created_at": _now_epoch(),
+                            }
+                            yield json.dumps(content_obj).encode() + b"\n"
+                        break
+                    except Exception:
+                        # If follow-up fails, continue streaming loop
+                        continue
+
                 token = delta.get("content")
                 if token:
                     accumulated += token
@@ -120,7 +211,7 @@ async def _stream_run_from_azure(messages: List[Dict[str, Any]]) -> AsyncGenerat
     # Fallback: if no streamed tokens, attempt non-stream call once
     if not accumulated:
         try:
-            resp = await client.chat(messages=messages, temperature=0.2)
+            resp = await client.chat(messages=convo, temperature=0.2, tools=tools, tool_choice="auto")
             text = (
                 (resp.get("choices") or [{}])[0]
                 .get("message", {})
