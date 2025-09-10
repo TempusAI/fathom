@@ -67,17 +67,13 @@ def _now_epoch() -> int:
 
 async def _stream_run_from_azure(messages: List[Dict[str, Any]]) -> AsyncGenerator[bytes, None]:
     """Streams UI-compatible JSON event objects based on Azure OpenAI streaming."""
-    # Resolve Azure OpenAI config
-    cfg = load_azure_openai_config()
-    client = AzureOpenAIClient(cfg)
-
-    # Initialise run metadata
+    # Initialise run metadata early so we can emit a clean error if config is missing
     run_id = str(uuid.uuid4())
     session_id = str(uuid.uuid4())
     created_at = _now_epoch()
     model_alias = "gpt-4o-azure"  # Alias; currently backed by gpt-4o deployment
 
-    # Emit RunStarted
+    # Emit RunStarted immediately
     start_obj = {
         "event": "RunStarted",
         "run_id": run_id,
@@ -86,6 +82,21 @@ async def _stream_run_from_azure(messages: List[Dict[str, Any]]) -> AsyncGenerat
         "created_at": created_at,
     }
     yield json.dumps(start_obj).encode() + b"\n"
+
+    # Resolve Azure OpenAI config; if missing, emit RunError and exit gracefully
+    try:
+        cfg = load_azure_openai_config()
+        client = AzureOpenAIClient(cfg)
+    except Exception as e:
+        err_obj = {
+            "event": "RunError",
+            "content_type": "text/plain",
+            "content": f"Azure OpenAI configuration error: {e}",
+            "model": model_alias,
+            "created_at": _now_epoch(),
+        }
+        yield json.dumps(err_obj).encode() + b"\n"
+        return
 
     # Prepare tool registry and hidden system context
     tools = get_tool_definitions()
