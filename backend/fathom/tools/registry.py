@@ -16,7 +16,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
             "function": {
                 "name": "catalog_get_fields",
                 "description": (
-                    "Get Honeycomb Catalog fields for matching tables. "
+                    "Get Luminesce table fields (column metadata) for matching tables. "
                     "Supports wildcards in tableLike (e.g., 'Lusid.Instrument', 'Lusid.Instrument%', 'Lusid.%')."
                 ),
                 "parameters": {
@@ -37,8 +37,8 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
             "function": {
                 "name": "sql_execute",
                 "description": (
-                    "Execute Luminesce SQL and return a compact result (columns, row_count, sample_rows up to 10). "
-                    "Prefer selecting specific columns and filtering by identifiers to keep results small."
+                    "Execute Luminesce SQL and return a compact result (columns, row_count, sample_rows ≤10). "
+                    "Guidance: Prefer select * with a tight WHERE for the first probe, or call catalog_get_fields('Table') to project specific columns."
                 ),
                 "parameters": {
                     "type": "object",
@@ -46,10 +46,10 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
                         "sql": {"type": "string", "description": "The Luminesce SQL to execute."},
                         "scalarParameters": {
                             "type": "object",
-                            "description": "Optional scalar parameters (key-value) for the SQL execution.",
+                            "description": "Optional scalar parameters (key-value). Inlined literals are preferred for MVP.",
                             "additionalProperties": {"type": ["string", "number", "boolean"]},
                         },
-                        "queryName": {"type": "string", "description": "Optional query name for logs."},
+                        "queryName": {"type": "string", "description": "Optional query name for logs."}
                     },
                     "required": ["sql"],
                     "additionalProperties": False,
@@ -85,14 +85,21 @@ def execute_tool_call(
 def build_tool_cheat_sheet() -> str:
     """Compact system prompt describing tools and best practices (token-efficient)."""
     return (
-        "You can call two tools to investigate LUSID data via Honeycomb (Luminesce).\n"
-        "- catalog_get_fields(tableLike): List fields for matching tables (wildcards ok).\n"
-        "- sql_execute(sql, scalarParameters?, queryName?): Run Luminesce SQL; returns columns, row_count, sample_rows (≤10).\n"
-        "Guidance: Select only required columns; filter using identifiers (e.g., LusidInstrumentId, PortfolioScope/Code); limit result sizes.\n"
-        'Parameters: Prefer inlining literals directly in the SQL body for MVP reliability. If you provide scalarParameters, they may be ignored.\n'
+        "Tools for exploring LUSID via Luminesce SQL:\n"
+        "- catalog_get_fields(tableLike): Return cached-or-fetched field lists with a compact summary.\n"
+        "- sql_execute(sql, scalarParameters?, queryName?): Execute SQL (results are compact).\n"
+        "Guidance: Prefer select * with a tight WHERE for the first probe, or call catalog_get_fields('Table') first to project specific columns.\n"
+        'Parameters: Prefer inlining literals directly in the SQL body for MVP reliability. scalarParameters may be ignored.\n'
         "Examples:\n"
+        "- sql_execute('select * from Lusid.Instrument where LusidInstrumentId=\\'LUID_123\\'')\n"
         "- catalog_get_fields('Lusid.Instrument')\n"
-        "- sql_execute('select LusidInstrumentId, Name from Lusid.Instrument where LusidInstrumentId = \'LUID_123\'')\n"
+        "Common tables (quick context):\n"
+        "- Lusid.Instrument: Instrument master (IDs, DisplayName, Type, State, Scope, AsAt, EffectiveAt).\n"
+        "- Lusid.Instrument.Quote: Quotes by instrument/provider/date (Bid/Ask/Mid, Ccy, Source).\n"
+        "- Lusid.Portfolio: Portfolio entities (Scope, Code, Name, Type, created/modified timestamps).\n"
+        "- Lusid.Portfolio.Holding: Holdings/positions (Scope, Code, LusidInstrumentId, Quantity/Cost, Ccy, AsAt, EffectiveAt).\n"
+        "- Lusid.Portfolio.Txn: Transactions (Trade/Settle dates, Instrument, Quantity, Consideration, TxnType).\n"
+        "- Scheduler.Schedule: Scheduled SQL jobs (QueryName, Cron/NextRun, Enabled, Status).\n"
         "Use catalog_get_fields before querying unfamiliar tables. Keep queries targeted."
     )
 
