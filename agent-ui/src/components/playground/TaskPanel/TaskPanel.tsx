@@ -9,8 +9,19 @@ import { TaskList } from './TaskList'
 import { SearchFilter } from './SearchFilter'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
-export function TaskPanel() {
+interface TaskPanelProps {
+  showHeader?: boolean
+  className?: string
+  /**
+   * When provided, overrides internal visibility check.
+   * Useful for forcing visibility inside overlays/trays even after chat starts.
+   */
+  visibleOverride?: boolean
+}
+
+export function TaskPanel({ showHeader = true, className, visibleOverride }: TaskPanelProps) {
   const { 
     taskGroups, 
     setTaskGroups, 
@@ -58,7 +69,8 @@ export function TaskPanel() {
     }
   }, [selectedEndpoint, taskFilter, setTaskGroups])
 
-  if (!isTaskPanelVisible) {
+  const isVisible = visibleOverride ?? isTaskPanelVisible
+  if (!isVisible) {
     return null
   }
 
@@ -129,35 +141,59 @@ export function TaskPanel() {
   })
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex flex-col gap-4 p-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-foreground">
-            Aggregation Error Tasks
-          </h2>
-          <p className="text-sm text-muted-foreground mt-2">
-            Select tasks to investigate data quality issues
-          </p>
-        </div>
-        
-        <Separator className="bg-border/30" />
-        
-        {/* Filters */}
-        <div className="flex justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-40">
-              <DateFilter />
+    <div
+      className={cn(
+        'flex h-full flex-col rounded-xl border',
+        showHeader ? 'bg-card' : 'bg-background-secondary',
+        className
+      )}
+    >
+      {/* Header (optional) */}
+      {showHeader && (
+        <div className="flex flex-col gap-4 p-6">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-foreground">
+              Aggregation Error Tasks
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              Select tasks to investigate data quality issues
+            </p>
+          </div>
+          <Separator className="bg-border/30" />
+          {/* Filters */}
+          <div className="flex justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-40">
+                <DateFilter />
+              </div>
+              <div className="w-44">
+                <BatchFilter />
+              </div>
             </div>
-            <div className="w-44">
-              <BatchFilter />
+            <div className="w-64">
+              <SearchFilter />
             </div>
           </div>
-          <div className="w-64">
-            <SearchFilter />
+        </div>
+      )}
+
+      {!showHeader && (
+        <div className="flex flex-col gap-4 p-4 border-b border-border/30">
+          <div className="flex justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-40">
+                <DateFilter />
+              </div>
+              <div className="w-44">
+                <BatchFilter />
+              </div>
+            </div>
+            <div className="w-64">
+              <SearchFilter />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Task List */}
       <div className="flex-1 overflow-hidden">

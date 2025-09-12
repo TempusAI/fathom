@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fathom.routers import tasks
+from fathom.routers import playground as playground_router
 import os
 from dotenv import load_dotenv
 import asyncio
@@ -10,8 +11,14 @@ import lusid
 from lusid.extensions.configuration_loaders import SecretsFileConfigurationLoader
 import aiohttp
 
-# Load environment variables
+# Load environment variables (backend/.env, repo-root .env.local fallback)
 load_dotenv()
+repo_root_env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+repo_root_env_local = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env.local"))
+if os.path.exists(repo_root_env):
+    load_dotenv(repo_root_env, override=True)
+if os.path.exists(repo_root_env_local):
+    load_dotenv(repo_root_env_local, override=True)
 
 async def lifespan(app: FastAPI):
     # Resolve secrets path (absolute)
@@ -29,6 +36,7 @@ async def lifespan(app: FastAPI):
 
     # Create shared aiohttp session and ApiClientFactory
     session = aiohttp.ClientSession()
+    app.state.http_session = session
     try:
         loader = SecretsFileConfigurationLoader(secrets_path)
         app.state.lusid_factory = lusid.ApiClientFactory(
@@ -69,6 +77,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(tasks.router, prefix="/fathom", tags=["tasks"])
+app.include_router(playground_router.router, prefix="/v1/playground", tags=["playground"])
 
 @app.get("/health")
 async def health_check():

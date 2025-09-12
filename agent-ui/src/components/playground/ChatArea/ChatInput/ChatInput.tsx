@@ -79,7 +79,7 @@ const CLAUDE_SVG = (
 )
 
 const ChatInput = () => {
-  const { setTaskPanelVisible, selectedModel, agents, teams, mode } = usePlaygroundStore()
+  const { setTaskPanelVisible, selectedModel, agents, teams, mode, setIsTaskTrayOpen } = usePlaygroundStore()
   const { handleStreamResponse } = useAIChatStreamHandler()
   const [selectedAgent] = useQueryState('agent')
   const [teamId] = useQueryState('team')
@@ -135,6 +135,8 @@ const ChatInput = () => {
     setTaskPanelVisible(false)
 
     try {
+      // Auto-minimise tray when sending
+      setIsTaskTrayOpen(false)
       await handleStreamResponse(currentMessage)
     } catch (error) {
       toast.error(
@@ -156,7 +158,7 @@ const ChatInput = () => {
   const currentModel = getCurrentModel()
 
   return (
-    <div className="w-full max-w-3xl mx-auto py-4">
+    <div className="w-full max-w-4xl mx-auto py-4">
       <div className="bg-zinc-800 rounded-2xl p-1.5 pt-4">
         {/* Task Chips Area */}
         <div className="px-2 pb-2">

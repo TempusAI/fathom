@@ -85,6 +85,7 @@ interface PlaygroundStore {
   taskGroups: TaskGroup[]
   taskFilter: TaskFilter
   isTaskPanelVisible: boolean
+  isTaskTrayOpen: boolean
   
   // Task actions
   addSelectedTask: (task: WorkflowTask) => void
@@ -95,6 +96,7 @@ interface PlaygroundStore {
   setTaskGroups: (groups: TaskGroup[]) => void
   clearSelectedTasks: () => void
   setTaskPanelVisible: (visible: boolean) => void
+  setIsTaskTrayOpen: (open: boolean) => void
 }
 
 export const usePlaygroundStore = create<PlaygroundStore>()(
@@ -124,7 +126,7 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       hasStorage: false,
       setHasStorage: (hasStorage) => set(() => ({ hasStorage })),
       chatInputRef: { current: null },
-      selectedEndpoint: 'http://localhost:7777',
+      selectedEndpoint: 'http://localhost:8000',
       setSelectedEndpoint: (selectedEndpoint) =>
         set(() => ({ selectedEndpoint })),
       agents: [],
@@ -154,6 +156,7 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       taskGroups: [],
       taskFilter: {},
       isTaskPanelVisible: true,
+      isTaskTrayOpen: false,
       
       // Task actions
       addSelectedTask: (task) =>
@@ -196,7 +199,8 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       clearSelectedTasks: () =>
         set(() => ({ selectedTasks: [] })),
       setTaskPanelVisible: (visible) =>
-        set(() => ({ isTaskPanelVisible: visible }))
+        set(() => ({ isTaskPanelVisible: visible })),
+      setIsTaskTrayOpen: (open) => set(() => ({ isTaskTrayOpen: open }))
     }),
     {
       name: 'endpoint-storage',
