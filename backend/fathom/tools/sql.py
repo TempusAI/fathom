@@ -86,8 +86,27 @@ def run_sql_execute(
 ) -> Dict[str, Any]:
     """Execute arbitrary Luminesce SQL and return compact results suitable for LLM context."""
     client = _get_honeycomb_client(api_factory)
+    # Normalize scalar parameters: accept dict or string; ensure JSON object for Honeycomb
+    normalized_params: Dict[str, Any] = {}
+    if isinstance(scalar_parameters, dict):
+        normalized_params = scalar_parameters
+    elif isinstance(scalar_parameters, str) and scalar_parameters.strip():
+        raw = scalar_parameters.strip()
+        # Replace single quotes with double quotes if needed, then attempt to parse
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                normalized_params = parsed
+        except Exception:
+            try:
+                repaired = raw.replace("'", '"')
+                parsed = json.loads(repaired)
+                if isinstance(parsed, dict):
+                    normalized_params = parsed
+            except Exception:
+                normalized_params = {}
     started_at = time.time()
-    raw = client.execute_sql_json(sql=sql, scalar_parameters=scalar_parameters or {}, query_name=query_name, json_proper=True)
+    raw = client.execute_sql_json(sql=sql, scalar_parameters=normalized_params, query_name=query_name, json_proper=True)
     duration_ms = int((time.time() - started_at) * 1000)
 
     columns, sample_rows, row_count = _summarize_tabular_result(raw, sample_limit=sample_limit)

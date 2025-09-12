@@ -105,6 +105,14 @@ class AzureOpenAIClient:
 
     def __init__(self, config: AzureOpenAIConfig, session: Optional[aiohttp.ClientSession] = None):
         self._config = config
+        # Prefer shared session from app.state if not provided
+        if session is None:
+            try:
+                from main import app  # local import to avoid circulars at import time
+                shared = getattr(app.state, "http_session", None)
+                session = shared
+            except Exception:
+                pass
         self._session = session
         self._credential = DefaultAzureCredential()
         # Token provider callable that returns a fresh Bearer token string
@@ -165,33 +173,46 @@ class AzureOpenAIClient:
             payload["tools"] = tools
         if tool_choice is not None:
             payload["tool_choice"] = tool_choice
+        # Enable server-sent events per Azure API (preferred over query param)
+        payload["stream"] = True
         headers = await self._get_headers()
+        # Hint streaming MIME type for some proxies
+        headers["Accept"] = "text/event-stream"
         close_session = False
         session = self._session
         if session is None:
             session = aiohttp.ClientSession()
             close_session = True
 
-        url = self.base_url + "&stream=true"
+        url = self.base_url
         try:
             async with session.post(url, headers=headers, json=payload, timeout=None) as resp:
                 resp.raise_for_status()
-                async for raw_line in resp.content:
+                # Manual SSE parsing: accumulate text and split by newlines
+                buffer = ""
+                async for chunk_bytes in resp.content.iter_chunked(1024):
                     try:
-                        line = raw_line.decode("utf-8").strip()
+                        buffer += chunk_bytes.decode("utf-8")
                     except Exception:
                         continue
-                    if not line:
-                        continue
-                    if line.startswith("data: "):
+                    while True:
+                        nl = buffer.find("\n")
+                        if nl == -1:
+                            break
+                        line = buffer[:nl].strip()
+                        buffer = buffer[nl + 1 :]
+                        if not line:
+                            continue
+                        if not line.startswith("data: "):
+                            continue
                         data_part = line[len("data: "):].strip()
                         if data_part == "[DONE]":
-                            break
+                            return
                         try:
                             chunk = json.loads(data_part)
                             yield chunk
                         except Exception:
-                            # Skip non-JSON lines
+                            # Skip malformed lines
                             continue
         finally:
             if close_session:

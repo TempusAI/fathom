@@ -106,108 +106,138 @@ async def _stream_run_from_azure(messages: List[Dict[str, Any]]) -> AsyncGenerat
 
     accumulated = ""
     try:
-        async for chunk in client.stream_chat(messages=convo, temperature=0.2, tools=tools, tool_choice="auto"):
-            try:
-                choices = chunk.get("choices", [])
-                if not choices:
-                    continue
-                delta = choices[0].get("delta") or {}
-
-                # Tool calls in stream (Azure style) can appear as tool_calls list on message
-                tool_calls = delta.get("tool_calls") or []
-                if tool_calls:
-                    # For each tool call, execute synchronously and push tool message into convo; then continue
-                    for call in tool_calls:
-                        tool_call_id = call.get("id") or str(uuid.uuid4())
-                        fn = (call.get("function") or {})
-                        name = fn.get("name")
-                        raw_args = fn.get("arguments") or "{}"
-                        try:
-                            args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
-                        except Exception:
-                            args = {}
-
-                        # Emit tool start
-                        start_evt = {
-                            "event": "RunToolCallStarted",
-                            "tool_name": name,
-                            "tool_call_id": tool_call_id,
-                            "created_at": _now_epoch(),
-                        }
-                        yield json.dumps(start_evt).encode() + b"\n"
-
-                        # Execute tool
-                        from main import app
-                        api_factory: lusid.ApiClientFactory | None = getattr(app.state, "lusid_factory", None)
-                        try:
-                            result = execute_tool_call(api_factory, name=name, arguments=args)
-                            tool_msg = {
-                                "role": "tool",
-                                "tool_call_id": tool_call_id,
-                                "name": name,
-                                "content": json.dumps(result),
-                            }
-                            convo.append(tool_msg)
-
-                            # Emit tool completed with compact content
-                            done_evt = {
-                                "event": "RunToolCallCompleted",
-                                "tool_name": name,
-                                "tool_call_id": tool_call_id,
-                                "created_at": _now_epoch(),
-                                "content": result,
-                            }
-                            yield json.dumps(done_evt).encode() + b"\n"
-                        except Exception as te:
-                            err_payload = {"error": str(te)}
-                            tool_msg = {
-                                "role": "tool",
-                                "tool_call_id": tool_call_id,
-                                "name": name,
-                                "content": json.dumps(err_payload),
-                            }
-                            convo.append(tool_msg)
-                            err_evt = {
-                                "event": "RunToolCallCompleted",
-                                "tool_name": name,
-                                "tool_call_id": tool_call_id,
-                                "created_at": _now_epoch(),
-                                "content": err_payload,
-                            }
-                            yield json.dumps(err_evt).encode() + b"\n"
-
-                    # After handling tool calls, immediately trigger a non-stream assistant turn to integrate tool results
-                    try:
-                        follow = await client.chat(messages=convo, temperature=0.2, tools=tools, tool_choice="auto")
-                        text = ((follow.get("choices") or [{}])[0].get("message", {}) or {}).get("content")
-                        if text:
-                            accumulated += text
-                            content_obj = {
-                                "event": "RunResponseContent",
-                                "content_type": "text/markdown",
-                                "content": accumulated,
-                                "model": model_alias,
-                                "created_at": _now_epoch(),
-                            }
-                            yield json.dumps(content_obj).encode() + b"\n"
-                        break
-                    except Exception:
-                        # If follow-up fails, continue streaming loop
+        # Stream with mid-turn tool-call support (up to 4 iterations)
+        iterations = 0
+        while iterations < 4:
+            iterations += 1
+            pending_calls: Dict[int, Dict[str, Any]] = {}
+            # Stream one assistant turn
+            async for chunk in client.stream_chat(messages=convo, temperature=0.2, tools=tools, tool_choice="auto"):
+                try:
+                    choices = chunk.get("choices", [])
+                    if not choices:
                         continue
+                    delta = choices[0].get("delta") or {}
+                    finish_reason = choices[0].get("finish_reason")
 
-                token = delta.get("content")
-                if token:
-                    accumulated += token
-                    content_obj = {
-                        "event": "RunResponseContent",
-                        "content_type": "text/markdown",
-                        "content": accumulated,
-                        "model": model_alias,
+                    # Accumulate tool_call parts by index
+                    stream_calls = delta.get("tool_calls") or []
+                    for call in stream_calls:
+                        idx = call.get("index", 0)
+                        existing = pending_calls.get(idx) or {"id": call.get("id") or str(uuid.uuid4()), "name": None, "arguments": ""}
+                        fn = call.get("function") or {}
+                        if fn.get("name"):
+                            existing["name"] = fn.get("name")
+                        if "arguments" in fn and fn.get("arguments"):
+                            existing["arguments"] += fn.get("arguments")
+                        pending_calls[idx] = existing
+
+                    token = delta.get("content")
+                    if token:
+                        accumulated += token
+                        yield json.dumps({
+                            "event": "RunResponseContent",
+                            "content_type": "text/markdown",
+                            "content": accumulated,
+                            "model": model_alias,
+                            "created_at": _now_epoch(),
+                        }).encode() + b"\n"
+
+                    if finish_reason == "tool_calls":
+                        break
+                except Exception:
+                    continue
+
+            # If no tool calls requested during stream, we're done
+            if not pending_calls:
+                break
+
+            # Execute the pending tool calls, append results, then loop to stream again
+            assistant_tool_calls = []
+            for idx in sorted(pending_calls.keys()):
+                c = pending_calls[idx]
+                assistant_tool_calls.append({
+                    "id": c["id"],
+                    "type": "function",
+                    "function": {"name": c.get("name") or "", "arguments": c.get("arguments") or "{}"},
+                })
+            convo.append({"role": "assistant", "tool_calls": assistant_tool_calls})
+
+            from main import app
+            api_factory: lusid.ApiClientFactory | None = getattr(app.state, "lusid_factory", None)
+            for c in assistant_tool_calls:
+                tool_call_id = c.get("id") or str(uuid.uuid4())
+                name = (c.get("function") or {}).get("name")
+                raw_args = (c.get("function") or {}).get("arguments") or "{}"
+                try:
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                except Exception:
+                    args = {}
+
+                start_evt = {
+                    "event": "ToolCallStarted",
+                    "tool_name": name,
+                    "tool_call_id": tool_call_id,
+                    "created_at": _now_epoch(),
+                    "tool": {
+                        "role": "assistant",
+                        "content": None,
+                        "tool_call_id": tool_call_id,
+                        "tool_name": name,
+                        "tool_args": {k: str(v) for k, v in (args or {}).items()},
+                        "tool_call_error": False,
+                        "metrics": {"time": 0},
                         "created_at": _now_epoch(),
+                    },
+                }
+                yield json.dumps(start_evt).encode() + b"\n"
+
+                try:
+                    t0 = time.time()
+                    result = execute_tool_call(api_factory, name=name, arguments=args)
+                    elapsed = int((time.time() - t0) * 1000)
+                    tool_msg = {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": json.dumps(result)}
+                    convo.append(tool_msg)
+                    done_evt = {
+                        "event": "ToolCallCompleted",
+                        "tool_name": name,
+                        "tool_call_id": tool_call_id,
+                        "created_at": _now_epoch(),
+                        "content": result,
+                        "tool": {
+                            "role": "tool",
+                            "content": json.dumps(result),
+                            "tool_call_id": tool_call_id,
+                            "tool_name": name,
+                            "tool_args": {k: str(v) for k, v in (args or {}).items()},
+                            "tool_call_error": False,
+                            "metrics": {"time": elapsed},
+                            "created_at": _now_epoch(),
+                        },
                     }
-                    yield json.dumps(content_obj).encode() + b"\n"
-            except Exception:
-                continue
+                    yield json.dumps(done_evt).encode() + b"\n"
+                except Exception as te:
+                    err_payload = {"error": str(te)}
+                    tool_msg = {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": json.dumps(err_payload)}
+                    convo.append(tool_msg)
+                    err_evt = {
+                        "event": "ToolCallCompleted",
+                        "tool_name": name,
+                        "tool_call_id": tool_call_id,
+                        "created_at": _now_epoch(),
+                        "content": err_payload,
+                        "tool": {
+                            "role": "tool",
+                            "content": json.dumps(err_payload),
+                            "tool_call_id": tool_call_id,
+                            "tool_name": name,
+                            "tool_args": {k: str(v) for k, v in (args or {}).items()},
+                            "tool_call_error": True,
+                            "metrics": {"time": 0},
+                            "created_at": _now_epoch(),
+                        },
+                    }
+                    yield json.dumps(err_evt).encode() + b"\n"
     except Exception as e:
         err_obj = {
             "event": "RunError",

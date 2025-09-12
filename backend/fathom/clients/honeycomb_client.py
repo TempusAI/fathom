@@ -56,13 +56,19 @@ class HoneycombClient:
         """
         url = f"{self.base_url}/api/Sql/json"
         params = {"jsonProper": str(json_proper).lower()}
-        payload: Dict[str, Any] = {
-            "Sql": sql,
-            "QueryName": query_name or f"Fathom.Query.{str(uuid.uuid4())[:8]}",
-            "scalarParameters": scalar_parameters or {},
-            "Parameters": scalar_parameters or {},
-        }
-        resp = requests.post(url, params=params, headers=self._headers(), json=payload, timeout=self._timeout)
+        if query_name:
+            params["queryName"] = query_name
+        else:
+            params["queryName"] = f"Fathom.Query.{str(uuid.uuid4())[:8]}"
+        # We purposefully do NOT send scalarParameters; inline values directly in SQL body for reliability.
+
+        # Honeycomb expects raw SQL in the body (text/plain) for PutByQueryJson
+        headers = self._headers()
+        headers["Content-Type"] = "text/plain; charset=utf-8"
+        headers["Accept"] = "application/json, text/plain, text/json"
+
+        # Many Honeycomb deployments require PUT for Sql/json (POST can 405)
+        resp = requests.put(url, params=params, headers=headers, data=sql.encode("utf-8"), timeout=self._timeout)
         resp.raise_for_status()
         return resp.json()
 

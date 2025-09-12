@@ -89,9 +89,10 @@ def build_tool_cheat_sheet() -> str:
         "- catalog_get_fields(tableLike): List fields for matching tables (wildcards ok).\n"
         "- sql_execute(sql, scalarParameters?, queryName?): Run Luminesce SQL; returns columns, row_count, sample_rows (≤10).\n"
         "Guidance: Select only required columns; filter using identifiers (e.g., LusidInstrumentId, PortfolioScope/Code); limit result sizes.\n"
+        'Parameters: Prefer inlining literals directly in the SQL body for MVP reliability. If you provide scalarParameters, they may be ignored.\n'
         "Examples:\n"
         "- catalog_get_fields('Lusid.Instrument')\n"
-        "- sql_execute('select LusidInstrumentId, Name from Lusid.Instrument where LusidInstrumentId=@id', {id:'LUID_123'})\n"
+        "- sql_execute('select LusidInstrumentId, Name from Lusid.Instrument where LusidInstrumentId = \'LUID_123\'')\n"
         "Use catalog_get_fields before querying unfamiliar tables. Keep queries targeted."
     )
 
