@@ -158,7 +158,7 @@ const ChatInput = () => {
   const currentModel = getCurrentModel()
 
   return (
-    <div className="w-full max-w-3xl mx-auto py-4">
+    <div className="w-full max-w-4xl mx-auto py-4">
       <div className="bg-zinc-800 rounded-2xl p-1.5 pt-4">
         {/* Task Chips Area */}
         <div className="px-2 pb-2">

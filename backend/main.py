@@ -36,6 +36,7 @@ async def lifespan(app: FastAPI):
 
     # Create shared aiohttp session and ApiClientFactory
     session = aiohttp.ClientSession()
+    app.state.http_session = session
     try:
         loader = SecretsFileConfigurationLoader(secrets_path)
         app.state.lusid_factory = lusid.ApiClientFactory(
