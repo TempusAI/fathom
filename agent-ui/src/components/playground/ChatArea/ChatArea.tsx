@@ -98,18 +98,18 @@ export default ChatArea
 function ToolContextViewer() {
   const [open, setOpen] = useState(false)
   const messages = usePlaygroundStore((s) => s.messages)
-  const compactBlocks = messages
-    .filter((m) => m.role === 'tool' && typeof m.content === 'string' && (m as any)._compact)
-    .map((m, i) => ({ idx: i, text: m.content as string }))
+  const compactBlocks = usePlaygroundStore((s) => s.compactToolContexts).map((text, i) => ({ idx: i, text }))
 
   return (
     <>
       <button
         type="button"
+        aria-label="View compact tool context"
+        title="View compact tool context"
         onClick={() => setOpen(true)}
-        className="fixed bottom-10 right-4 z-30 rounded-md bg-white/10 px-2.5 py-1.5 text-xs text-white/80 shadow-sm backdrop-blur-md hover:bg-white/15"
+        className="fixed bottom-12 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/80 shadow-sm backdrop-blur-md hover:bg-white/15"
       >
-        View Tool Context
+        <Icon type="references" size="sm" />
       </button>
       {open && (
         <div className="fixed inset-0 z-40">

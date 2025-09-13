@@ -341,8 +341,37 @@ async def _stream_run_from_azure(messages: List[Dict[str, Any]]) -> AsyncGenerat
     yield json.dumps(end_obj).encode() + b"\n"
 
 
+def _compact_transcript_for_prompt(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return a compacted transcript that prefers compact tool messages if present.
+
+    When both full and compact exist for the same tool_call_id, keep only the compact one.
+    """
+    compact_by_id: Dict[str, Dict[str, Any]] = {}
+    for m in messages:
+        if m.get("role") == "tool" and m.get("is_compact") and m.get("tool_call_id"):
+            compact_by_id[str(m.get("tool_call_id"))] = m
+
+    out: List[Dict[str, Any]] = []
+    for m in messages:
+        if m.get("role") == "tool":
+            tcid = str(m.get("tool_call_id") or "")
+            if tcid and tcid in compact_by_id:
+                # Skip non-compact duplicates; compact version will be emitted in its turn
+                if not m.get("is_compact"):
+                    continue
+                # For compact, include as a plain tool message (drop the marker)
+                compact = dict(m)
+                compact.pop("is_compact", None)
+                out.append(compact)
+            else:
+                out.append(m)
+        else:
+            out.append(m)
+    return out
+
+
 async def _stream_run_with_storage(
-    prior_and_current_messages: List[Dict[str, Any]],
+    prompt_history_and_user: List[Dict[str, Any]],
     session_id: str,
     storage: AzureStorage,
 ) -> AsyncGenerator[bytes, None]:
@@ -396,12 +425,12 @@ async def _stream_run_with_storage(
     tools = get_tool_definitions()
     cheat_sheet = build_tool_cheat_sheet()
     system_msg = {"role": "system", "content": cheat_sheet}
-    convo: List[Dict[str, Any]] = [system_msg] + prior_and_current_messages
+    convo: List[Dict[str, Any]] = [system_msg] + prompt_history_and_user
 
     # Prepare persistence for this turn
     persist_messages: List[Dict[str, Any]] = []
-    if prior_and_current_messages:
-        last_msg = prior_and_current_messages[-1]
+    if prompt_history_and_user:
+        last_msg = prompt_history_and_user[-1]
         if last_msg.get("role") == "user":
             # Ensure a timestamp exists
             if "created_at" not in last_msg:
@@ -509,15 +538,12 @@ async def _stream_run_with_storage(
                     t0 = time.time()
                     result = execute_tool_call(api_factory, name=name, arguments=args)
                     elapsed = int((time.time() - t0) * 1000)
-                    # Persist full result for UI/history
+                    # Persist full result for UI/history (do not add to convo)
                     tool_msg = {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": json.dumps(result), "created_at": _now_epoch()}
-                    convo.append(tool_msg)
                     persist_messages.append(tool_msg)
-                    # Build compact prompt context for the model
+                    # Build compact prompt context for the model and stage it as a compact tool message
                     compact_text = build_prompt_context(name, result, args)
-                    # Also append a compact shadow message for the prompt only
-                    compact_msg = {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": compact_text, "created_at": _now_epoch(), "_compact": True}
-                    convo.append(compact_msg)
+                    convo.append({"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": compact_text, "is_compact": True})
                     done_evt = {
                         "event": "ToolCallCompleted",
                         "tool_name": name,
@@ -533,6 +559,7 @@ async def _stream_run_with_storage(
                             "tool_call_error": False,
                             "metrics": {"time": elapsed},
                             "created_at": _now_epoch(),
+                            "compact_context": compact_text,
                         },
                     }
                     yield json.dumps(done_evt).encode() + b"\n"
@@ -615,6 +642,8 @@ async def _stream_run_with_storage(
         # Best-effort persistence; do not fail the stream
         pass
 
+    # Build compacted transcript for token count and final prompt reflection
+    compact_convo = [system_msg] + _compact_transcript_for_prompt(prompt_history_and_user)
     # Emit RunCompleted (also include token count as final confirmation)
     end_obj = {
         "event": "RunCompleted",
@@ -623,7 +652,7 @@ async def _stream_run_with_storage(
         "model": model_alias,
         "created_at": _now_epoch(),
         "extra_data": {
-            "token_count": _approx_token_count(model_alias, [system_msg] + prior_and_current_messages)
+            "token_count": _approx_token_count(model_alias, compact_convo)
         }
     }
     yield json.dumps(end_obj).encode() + b"\n"
@@ -655,9 +684,14 @@ async def run_agent(
     )
     # Load prior transcript and add current user turn
     transcript = storage.load_transcript(session_id_resolved)
-    prior_and_current = transcript + [{"role": "user", "content": message, "created_at": _now_epoch()}]
+    # Build a mixed history that prefers compact tool messages when present
+    mixed_history: List[Dict[str, Any]] = []
+    # Convert persisted transcript (full messages) into a form where we prefer compact when both exist.
+    # We don't persist compact markers; compact messages are created during runtime. So here we keep transcript as-is.
+    mixed_history = transcript
+    prompt_history_and_user = mixed_history + [{"role": "user", "content": message, "created_at": _now_epoch()}]
     return StreamingResponse(
-        _stream_run_with_storage(prior_and_current, session_id_resolved, storage),
+        _stream_run_with_storage(prompt_history_and_user, session_id_resolved, storage),
         media_type="application/json",
     )
 
