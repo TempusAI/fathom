@@ -40,6 +40,7 @@ const useSessionLoader = () => {
     (state) => state.setIsSessionsLoading
   )
   const setSessionsData = usePlaygroundStore((state) => state.setSessionsData)
+  const setCurrentSessionId = usePlaygroundStore((s) => s.setCurrentSessionId)
 
   const getSessions = useCallback(
     async ({ entityType, agentId, teamId }: LoaderArgs) => {
@@ -83,6 +84,9 @@ const useSessionLoader = () => {
               )
 
         if (response) {
+          if (response.session_id) {
+            setCurrentSessionId(response.session_id)
+          }
           const sessionHistory = response.runs
             ? response.runs
             : response.memory.runs
@@ -169,7 +173,7 @@ const useSessionLoader = () => {
         return null
       }
     },
-    [selectedEndpoint, setMessages]
+    [selectedEndpoint, setMessages, setCurrentSessionId]
   )
 
   return { getSession, getSessions }

@@ -28,9 +28,9 @@ export function ModeSelector() {
   const [, setTeamId] = useQueryState('team')
   const [, setSessionId] = useQueryState('session')
 
-  const hasTeams = teams.length > 0
+  const hasTeams = false
   const hasAgents = agents.length > 0
-  const isDropdownDisabled = !(hasTeams && hasAgents)
+  const isDropdownDisabled = true
 
   const handleModeChange = (newMode: 'agent' | 'team') => {
     if (newMode === mode) return
@@ -48,14 +48,10 @@ export function ModeSelector() {
   }
 
   React.useEffect(() => {
-    if (!hasTeams && hasAgents && mode === 'team') {
-      setMode('agent')
-    } else if (!hasAgents && hasTeams && mode === 'agent') {
-      setMode('team')
-    }
-  }, [hasTeams, hasAgents, mode, setMode])
+    if (mode !== 'agent') setMode('agent')
+  }, [mode, setMode])
 
-  if (!hasTeams && !hasAgents) {
+  if (!hasAgents) {
     return (
       <Select disabled>
         <SelectTrigger className="h-9 w-full rounded-xl border border-primary/15 bg-primaryAccent text-xs font-medium uppercase opacity-50">
@@ -78,11 +74,6 @@ export function ModeSelector() {
         {hasAgents && (
           <SelectItem value="agent" className="cursor-pointer">
             <div className="text-xs font-medium uppercase">Agent</div>
-          </SelectItem>
-        )}
-        {hasTeams && (
-          <SelectItem value="team" className="cursor-pointer">
-            <div className="text-xs font-medium uppercase">Team</div>
           </SelectItem>
         )}
       </SelectContent>
