@@ -14,6 +14,7 @@ from fathom.clients.azure_openai_client import (
     load_azure_openai_config,
 )
 from fathom.tools.registry import get_tool_definitions, execute_tool_call, build_tool_cheat_sheet
+from fathom.tools.compact import build_prompt_context
 import lusid
 from fathom.storage.azure_storage import AzureStorage
 try:
@@ -508,9 +509,15 @@ async def _stream_run_with_storage(
                     t0 = time.time()
                     result = execute_tool_call(api_factory, name=name, arguments=args)
                     elapsed = int((time.time() - t0) * 1000)
+                    # Persist full result for UI/history
                     tool_msg = {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": json.dumps(result), "created_at": _now_epoch()}
                     convo.append(tool_msg)
                     persist_messages.append(tool_msg)
+                    # Build compact prompt context for the model
+                    compact_text = build_prompt_context(name, result, args)
+                    # Also append a compact shadow message for the prompt only
+                    compact_msg = {"role": "tool", "tool_call_id": tool_call_id, "name": name, "content": compact_text, "created_at": _now_epoch(), "_compact": True}
+                    convo.append(compact_msg)
                     done_evt = {
                         "event": "ToolCallCompleted",
                         "tool_name": name,
