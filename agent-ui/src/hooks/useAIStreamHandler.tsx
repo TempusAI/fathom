@@ -33,6 +33,8 @@ const useAIChatStreamHandler = () => {
   const { streamResponse } = useAIResponseStream()
   const currentSessionId = usePlaygroundStore((s) => s.currentSessionId)
   const setCurrentSessionId = usePlaygroundStore((s) => s.setCurrentSessionId)
+  const addCompactContext = usePlaygroundStore((s) => s.addCompactContext)
+  const clearCompactContexts = usePlaygroundStore((s) => s.clearCompactContexts)
 
   const updateMessagesWithErrorState = useCallback(() => {
     setMessages((prevMessages) => {
@@ -234,6 +236,11 @@ const useAIChatStreamHandler = () => {
                 }
                 return newMessages
               })
+              // Capture compact context from event payload if present
+              const compact = (chunk as any)?.tool?.compact_context
+              if (typeof compact === 'string' && compact.trim().length > 0) {
+                addCompactContext(compact)
+              }
             } else if (
               chunk.event === RunEvent.RunResponse ||
               chunk.event === RunEvent.RunResponseContent ||
@@ -466,7 +473,11 @@ const useAIChatStreamHandler = () => {
       setSessionId,
       hasStorage,
       processChunkToolCalls,
-      setTokenCount
+      setTokenCount,
+      setCurrentSessionId,
+      currentSessionId,
+      addCompactContext,
+      clearCompactContexts
     ]
   )
 

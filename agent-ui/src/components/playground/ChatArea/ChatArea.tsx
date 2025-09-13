@@ -5,7 +5,7 @@ import MessageArea from './MessageArea'
 import { usePlaygroundStore } from '@/store'
 import Icon from '@/components/ui/icon'
 import { cn } from '@/lib/utils'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { TaskPanel } from '../TaskPanel'
 const ChatArea = () => {
   const { isTaskTrayOpen, setIsTaskTrayOpen } = usePlaygroundStore()
@@ -80,6 +80,7 @@ const ChatArea = () => {
 
       {/* Base content remains rendered; overlay sits on top to avoid layout jump */}
       <MessageArea />
+      <ToolContextViewer />
       {typeof tokenCount === 'number' && (
         <div className="pointer-events-none fixed bottom-3 right-4 z-30 rounded-md bg-white/5 px-2.5 py-1.5 text-xs text-white/80 shadow-sm backdrop-blur-sm">
           <span className="opacity-70">Tokens:</span> <span className="font-mono">{tokenCount.toLocaleString()}</span>
@@ -93,3 +94,48 @@ const ChatArea = () => {
 }
 
 export default ChatArea
+
+function ToolContextViewer() {
+  const [open, setOpen] = useState(false)
+  const messages = usePlaygroundStore((s) => s.messages)
+  const compactBlocks = usePlaygroundStore((s) => s.compactToolContexts).map((text, i) => ({ idx: i, text }))
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="View compact tool context"
+        title="View compact tool context"
+        onClick={() => setOpen(true)}
+        className="fixed bottom-12 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/80 shadow-sm backdrop-blur-md hover:bg-white/15"
+      >
+        <Icon type="references" size="sm" />
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-background/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 z-50 flex items-start justify-center p-4 pt-16">
+            <div className="w-full max-w-3xl rounded-xl bg-card shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <div className="text-sm font-medium">Tool Context Sent To Model</div>
+                <button className="rounded-md px-2 py-1 text-xs hover:bg-accent" onClick={() => setOpen(false)}>Close</button>
+              </div>
+              <div className="max-h-[70vh] overflow-auto p-4 font-mono text-xs leading-5 whitespace-pre-wrap">
+                {compactBlocks.length === 0 ? (
+                  <div className="opacity-70">No compacted tool context yet.</div>
+                ) : (
+                  compactBlocks.map((b) => (
+                    <div key={b.idx} className="mb-4">
+                      <div className="mb-2 rounded bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-white/70">Tool Call</div>
+                      <pre className="whitespace-pre-wrap">{b.text}</pre>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

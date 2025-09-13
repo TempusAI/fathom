@@ -114,7 +114,7 @@ class AzureStorage:
         table = self._table()
         try:
             # RowKey is session_id; PartitionKey varies by day, so search by RowKey
-            entities = table.query_entities(filter=f"RowKey eq '{session_id}'", results_per_page=1)
+            entities = table.query_entities(query_filter=f"RowKey eq '{session_id}'", results_per_page=1)
             for _ in entities:
                 return True
             return False
@@ -144,7 +144,7 @@ class AzureStorage:
         table = self._table()
         # Fetch entity by RowKey (session_id); PartitionKey unknown → query
         try:
-            entities = list(table.query_entities(filter=f"RowKey eq '{session_id}'", results_per_page=1))
+            entities = list(table.query_entities(query_filter=f"RowKey eq '{session_id}'", results_per_page=1))
             if not entities:
                 return
             entity = entities[0]
@@ -195,7 +195,7 @@ class AzureStorage:
         end_key = _yyyymmdd(end)
         # Note: Azure Tables ignores order by; we'll sort client-side
         filter_expr = f"(PartitionKey ge '{start_key}' and PartitionKey le '{end_key}') and AgentId eq '{agent_id}'"
-        entities = list(table.query_entities(filter=filter_expr))
+        entities = list(table.query_entities(query_filter=filter_expr))
         # Sort by UpdatedAt desc
         entities.sort(key=lambda e: int(e.get("UpdatedAt", 0)), reverse=True)
         out: List[Dict[str, Any]] = []
@@ -208,14 +208,15 @@ class AzureStorage:
         return out
 
     def delete_session(self, session_id: str) -> None:
-        # Resolve entity to get PartitionKey, then delete row and blob
+        # Resolve all entities to get PartitionKey(s), then delete row(s) and blob
         table = self._table()
         try:
-            entities = list(table.query_entities(filter=f"RowKey eq '{session_id}'", results_per_page=1))
-            if not entities:
-                return
-            entity = entities[0]
-            table.delete_entity(partition_key=entity["PartitionKey"], row_key=entity["RowKey"])
+            entities = list(table.query_entities(query_filter=f"RowKey eq '{session_id}'"))
+            for entity in entities:
+                try:
+                    table.delete_entity(partition_key=entity["PartitionKey"], row_key=entity["RowKey"])
+                except Exception:
+                    continue
         except Exception:
             pass
 
