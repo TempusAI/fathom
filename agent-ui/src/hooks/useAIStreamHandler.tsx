@@ -29,7 +29,10 @@ const useAIChatStreamHandler = () => {
   const setIsStreaming = usePlaygroundStore((state) => state.setIsStreaming)
   const setSessionsData = usePlaygroundStore((state) => state.setSessionsData)
   const hasStorage = usePlaygroundStore((state) => state.hasStorage)
+  const setTokenCount = usePlaygroundStore((state) => state.setTokenCount)
   const { streamResponse } = useAIResponseStream()
+  const currentSessionId = usePlaygroundStore((s) => s.currentSessionId)
+  const setCurrentSessionId = usePlaygroundStore((s) => s.setCurrentSessionId)
 
   const updateMessagesWithErrorState = useCallback(() => {
     setMessages((prevMessages) => {
@@ -165,7 +168,12 @@ const useAIChatStreamHandler = () => {
         }
 
         formData.append('stream', 'true')
-        formData.append('session_id', sessionId ?? '')
+        // Guard session id: only send valid UUIDish values; avoid 'null'/'undefined'
+        const sidCandidate = ((sessionId ?? currentSessionId) ?? '').trim()
+        const sid = sidCandidate && sidCandidate !== 'null' && sidCandidate !== 'undefined' ? sidCandidate : ''
+        if (sid && sid !== 'null' && sid !== 'undefined') {
+          formData.append('session_id', sid)
+        }
 
         await streamResponse({
           apiUrl: playgroundRunUrl,
@@ -177,8 +185,18 @@ const useAIChatStreamHandler = () => {
               chunk.event === RunEvent.ReasoningStarted ||
               chunk.event === RunEvent.TeamReasoningStarted
             ) {
-              newSessionId = chunk.session_id as string
-              setSessionId(chunk.session_id as string)
+              if (chunk.extra_data && typeof (chunk.extra_data as any).token_count === 'number') {
+                setTokenCount((chunk.extra_data as any).token_count)
+              }
+              // If we already have a session in URL or store, DO NOT replace it.
+              // Only set when we don't have one yet (first turn/new chat).
+              if (!sessionId && !currentSessionId && chunk.session_id) {
+                newSessionId = chunk.session_id as string
+                setSessionId(chunk.session_id as string)
+                setCurrentSessionId(chunk.session_id as string)
+              } else {
+                newSessionId = (sessionId ?? currentSessionId) as string
+              }
               if (
                 hasStorage &&
                 (!sessionId || sessionId !== chunk.session_id) &&
@@ -351,6 +369,9 @@ const useAIChatStreamHandler = () => {
               chunk.event === RunEvent.RunCompleted ||
               chunk.event === RunEvent.TeamRunCompleted
             ) {
+              if (chunk.extra_data && typeof (chunk.extra_data as any).token_count === 'number') {
+                setTokenCount((chunk.extra_data as any).token_count)
+              }
               setMessages((prevMessages) => {
                 const newMessages = prevMessages.map((message, index) => {
                   if (
@@ -397,6 +418,7 @@ const useAIChatStreamHandler = () => {
           onError: (error) => {
             updateMessagesWithErrorState()
             setStreamingErrorMessage(error.message)
+            setTokenCount(null)
             if (hasStorage && newSessionId) {
               setSessionsData(
                 (prevSessionsData) =>
@@ -413,6 +435,7 @@ const useAIChatStreamHandler = () => {
         setStreamingErrorMessage(
           error instanceof Error ? error.message : String(error)
         )
+        setTokenCount(null)
         if (hasStorage && newSessionId) {
           setSessionsData(
             (prevSessionsData) =>
@@ -442,7 +465,8 @@ const useAIChatStreamHandler = () => {
       sessionId,
       setSessionId,
       hasStorage,
-      processChunkToolCalls
+      processChunkToolCalls,
+      setTokenCount
     ]
   )
 

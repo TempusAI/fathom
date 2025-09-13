@@ -17,6 +17,7 @@ import { useQueryState } from 'nuqs'
 
 const useChatActions = () => {
   const { chatInputRef } = usePlaygroundStore()
+  const setCurrentSessionId = usePlaygroundStore((s) => s.setCurrentSessionId)
   const selectedEndpoint = usePlaygroundStore((state) => state.selectedEndpoint)
   const [, setSessionId] = useQueryState('session')
   const setMessages = usePlaygroundStore((state) => state.setMessages)
@@ -69,6 +70,7 @@ const useChatActions = () => {
   const clearChat = useCallback(() => {
     setMessages([])
     setSessionId(null)
+    setCurrentSessionId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

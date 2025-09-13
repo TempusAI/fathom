@@ -11,6 +11,7 @@ const ChatArea = () => {
   const { isTaskTrayOpen, setIsTaskTrayOpen } = usePlaygroundStore()
   const messages = usePlaygroundStore((s) => s.messages)
   const isTaskPanelVisible = usePlaygroundStore((s) => s.isTaskPanelVisible)
+  const tokenCount = usePlaygroundStore((s) => s.tokenCount)
   // Close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -79,6 +80,11 @@ const ChatArea = () => {
 
       {/* Base content remains rendered; overlay sits on top to avoid layout jump */}
       <MessageArea />
+      {typeof tokenCount === 'number' && (
+        <div className="pointer-events-none fixed bottom-3 right-4 z-30 rounded-md bg-white/5 px-2.5 py-1.5 text-xs text-white/80 shadow-sm backdrop-blur-sm">
+          <span className="opacity-70">Tokens:</span> <span className="font-mono">{tokenCount.toLocaleString()}</span>
+        </div>
+      )}
       <div className="sticky bottom-0 ml-9 px-4 pb-2">
         <ChatInput />
       </div>
