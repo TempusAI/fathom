@@ -15,6 +15,7 @@ from fathom.clients.azure_openai_client import (
 )
 from fathom.tools.registry import get_tool_definitions, execute_tool_call, build_tool_cheat_sheet
 from fathom.tools.compact import build_prompt_context
+from fathom.tools.tasks_compact import build_compact_task_context
 import lusid
 from fathom.storage.azure_storage import AzureStorage
 try:
@@ -663,6 +664,7 @@ async def run_agent(
     message: str = Form(...),
     stream: Optional[bool] = Form(default=True),
     session_id: Optional[str] = Form(default=None),
+    selected_tasks: Optional[str] = Form(default=None),
 ):
     if not message:
         raise HTTPException(status_code=400, detail="Missing message")
@@ -682,14 +684,67 @@ async def run_agent(
         session_id=sanitized_session,
         title=ensure_title,
     )
-    # Load prior transcript and add current user turn
+    # Load prior transcript and prepare current turn (optionally with task user-context)
     transcript = storage.load_transcript(session_id_resolved)
+
+    # If selected_tasks provided and no prior task_context persisted, persist one system message
+    try:
+        if selected_tasks and isinstance(selected_tasks, str):
+            # Detect if a task_context system line already exists to avoid duplication
+            already_has_task_context = any(
+                (m.get("role") == "system" and isinstance(m.get("content"), str) and m.get("content", "").startswith("task_context:v1"))
+                for m in transcript
+            )
+            if not already_has_task_context:
+                try:
+                    tasks = json.loads(selected_tasks)
+                    if isinstance(tasks, list) and tasks:
+                        compact_context = build_compact_task_context(tasks)
+                        system_task_msg = {"role": "system", "content": compact_context, "created_at": _now_epoch()}
+                        # Persist before user message so all future turns include it
+                        storage.append_messages(session_id=session_id_resolved, new_messages=[system_task_msg])
+                        transcript.append(system_task_msg)
+                except Exception:
+                    # Ignore malformed payloads; proceed without task context
+                    pass
+    except Exception:
+        # Non-fatal if persistence fails
+        pass
     # Build a mixed history that prefers compact tool messages when present
     mixed_history: List[Dict[str, Any]] = []
     # Convert persisted transcript (full messages) into a form where we prefer compact when both exist.
     # We don't persist compact markers; compact messages are created during runtime. So here we keep transcript as-is.
     mixed_history = transcript
-    prompt_history_and_user = mixed_history + [{"role": "user", "content": message, "created_at": _now_epoch()}]
+
+    # If tasks were provided for this FIRST turn, attach a temporary user-context message so the model
+    # sees tasks "along with" the user's message (not as part of the tool cheat sheet). This temporary
+    # user-context is NOT persisted; only the final user message will be stored by the streamer.
+    user_turns: List[Dict[str, Any]] = []
+    try:
+        if selected_tasks and isinstance(selected_tasks, str):
+            print(f"DEBUG: Received selected_tasks parameter: {len(selected_tasks)} chars")
+            try:
+                tasks_for_turn = json.loads(selected_tasks)
+                if isinstance(tasks_for_turn, list) and tasks_for_turn:
+                    print(f"DEBUG: Parsed {len(tasks_for_turn)} tasks for context")
+                    compact_for_turn = build_compact_task_context(tasks_for_turn)
+                    user_turns.append({
+                        "role": "user",
+                        "content": f"Attached tasks (first turn):\n{compact_for_turn}",
+                        "created_at": _now_epoch(),
+                    })
+                    print(f"DEBUG: Added task context message: {len(compact_for_turn)} chars")
+                else:
+                    print("DEBUG: No valid tasks found in selected_tasks")
+            except Exception as e:
+                print(f"DEBUG: Failed to parse selected_tasks: {e}")
+        else:
+            print(f"DEBUG: No selected_tasks parameter. Value: {selected_tasks}")
+    except Exception as e:
+        print(f"DEBUG: Exception in task processing: {e}")
+
+    user_turns.append({"role": "user", "content": message, "created_at": _now_epoch()})
+    prompt_history_and_user = mixed_history + user_turns
     return StreamingResponse(
         _stream_run_with_storage(prompt_history_and_user, session_id_resolved, storage),
         media_type="application/json",
