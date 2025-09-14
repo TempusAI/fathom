@@ -1,3 +1,4 @@
+import type { WorkflowTask } from '@/types/tasks'
 export interface ToolCall {
   role: 'user' | 'tool' | 'system' | 'assistant'
   content: string | null
@@ -204,6 +205,10 @@ export interface PlaygroundChatMessage {
   videos?: VideoData[]
   audio?: AudioData[]
   response_audio?: ResponseAudio
+  // Optional compact summary of tasks attached on first turn
+  task_context_compact?: string
+  // Snapshot of tasks attached on first turn for rendering chips
+  attached_tasks?: WorkflowTask[]
 }
 
 export interface ComboboxAgent {

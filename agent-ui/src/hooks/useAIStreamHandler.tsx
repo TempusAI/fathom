@@ -35,6 +35,8 @@ const useAIChatStreamHandler = () => {
   const setCurrentSessionId = usePlaygroundStore((s) => s.setCurrentSessionId)
   const addCompactContext = usePlaygroundStore((s) => s.addCompactContext)
   const clearCompactContexts = usePlaygroundStore((s) => s.clearCompactContexts)
+  const selectedTasks = usePlaygroundStore((s) => s.selectedTasks)
+  const clearSelectedTasks = usePlaygroundStore((s) => s.clearSelectedTasks)
 
   const updateMessagesWithErrorState = useCallback(() => {
     setMessages((prevMessages) => {
@@ -132,11 +134,47 @@ const useAIChatStreamHandler = () => {
         return prevMessages
       })
 
-      addMessage({
-        role: 'user',
-        content: formData.get('message') as string,
-        created_at: Math.floor(Date.now() / 1000)
-      })
+      // If we are about to send selected_tasks on the first turn, also add a visible chip message context
+      const sidCandidate = ((sessionId ?? currentSessionId) ?? '').trim()
+      const sid = sidCandidate && sidCandidate !== 'null' && sidCandidate !== 'undefined' ? sidCandidate : ''
+      const isFirstAgentTurn =
+        mode === 'agent' &&
+        (!sid || sid.length === 0)
+      
+      console.log('DEBUG: UI chip check. Mode:', mode, 'SID:', sid, 'Tasks:', selectedTasks?.length || 0, 'IsFirst:', isFirstAgentTurn)
+      
+      if (
+        isFirstAgentTurn &&
+        Array.isArray(selectedTasks) &&
+        selectedTasks.length > 0
+      ) {
+        try {
+          const compact = selectedTasks
+            .map((t) => `${t.taskDefinitionDisplayName} (${t.id})`)
+            .slice(0, 5)
+            .join(', ')
+          addMessage({
+            role: 'user',
+            content: formData.get('message') as string,
+            created_at: Math.floor(Date.now() / 1000),
+            task_context_compact: compact,
+            attached_tasks: selectedTasks
+          })
+          console.log('DEBUG: Added message with task context:', compact)
+        } catch {
+          addMessage({
+            role: 'user',
+            content: formData.get('message') as string,
+            created_at: Math.floor(Date.now() / 1000)
+          })
+        }
+      } else {
+        addMessage({
+          role: 'user',
+          content: formData.get('message') as string,
+          created_at: Math.floor(Date.now() / 1000)
+        })
+      }
 
       addMessage({
         role: 'agent',
@@ -175,6 +213,27 @@ const useAIChatStreamHandler = () => {
         const sid = sidCandidate && sidCandidate !== 'null' && sidCandidate !== 'undefined' ? sidCandidate : ''
         if (sid && sid !== 'null' && sid !== 'undefined') {
           formData.append('session_id', sid)
+        }
+
+        // Send selected tasks ONLY on the first agent turn (no existing session id)
+        const willSendTasks = (
+          mode === 'agent' &&
+          (!sid || sid.length === 0) &&
+          Array.isArray(selectedTasks) &&
+          selectedTasks.length > 0
+        )
+        if (willSendTasks) {
+          try {
+            formData.append('selected_tasks', JSON.stringify(selectedTasks))
+            console.log('DEBUG: Sending selected tasks:', selectedTasks.length, 'tasks')
+          } catch {
+            // Best effort; if stringify fails, skip silently
+            console.log('DEBUG: Failed to stringify selected tasks')
+          }
+          // Clear selected tasks in the UI as soon as we send them
+          try { clearSelectedTasks() } catch {}
+        } else {
+          console.log('DEBUG: Not sending tasks. Mode:', mode, 'SID:', sid, 'Tasks:', selectedTasks?.length || 0)
         }
 
         await streamResponse({
@@ -477,7 +536,8 @@ const useAIChatStreamHandler = () => {
       setCurrentSessionId,
       currentSessionId,
       addCompactContext,
-      clearCompactContexts
+      clearCompactContexts,
+      selectedTasks
     ]
   )
 
