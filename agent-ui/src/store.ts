@@ -86,6 +86,9 @@ interface PlaygroundStore {
   taskFilter: TaskFilter
   isTaskPanelVisible: boolean
   isTaskTrayOpen: boolean
+  tokenCount: number | null
+  currentSessionId: string | null
+  compactToolContexts: string[]
   
   // Task actions
   addSelectedTask: (task: WorkflowTask) => void
@@ -97,6 +100,10 @@ interface PlaygroundStore {
   clearSelectedTasks: () => void
   setTaskPanelVisible: (visible: boolean) => void
   setIsTaskTrayOpen: (open: boolean) => void
+  setTokenCount: (count: number | null) => void
+  setCurrentSessionId: (sessionId: string | null) => void
+  addCompactContext: (context: string) => void
+  clearCompactContexts: () => void
 }
 
 export const usePlaygroundStore = create<PlaygroundStore>()(
@@ -137,7 +144,7 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       setSelectedModel: (selectedModel) => set(() => ({ selectedModel })),
       selectedTeamId: null,
       setSelectedTeamId: (teamId) => set(() => ({ selectedTeamId: teamId })),
-      mode: 'team',
+      mode: 'agent',
       setMode: (mode) => set(() => ({ mode })),
       sessionsData: null,
       setSessionsData: (sessionsData) =>
@@ -157,6 +164,9 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       taskFilter: {},
       isTaskPanelVisible: true,
       isTaskTrayOpen: false,
+      tokenCount: null,
+      currentSessionId: null,
+      compactToolContexts: [],
       
       // Task actions
       addSelectedTask: (task) =>
@@ -200,7 +210,12 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
         set(() => ({ selectedTasks: [] })),
       setTaskPanelVisible: (visible) =>
         set(() => ({ isTaskPanelVisible: visible })),
-      setIsTaskTrayOpen: (open) => set(() => ({ isTaskTrayOpen: open }))
+      setIsTaskTrayOpen: (open) => set(() => ({ isTaskTrayOpen: open })),
+      setTokenCount: (count) => set(() => ({ tokenCount: count })),
+      setCurrentSessionId: (sessionId) => set(() => ({ currentSessionId: sessionId })),
+      addCompactContext: (context) =>
+        set((state) => ({ compactToolContexts: [...state.compactToolContexts, context] })),
+      clearCompactContexts: () => set(() => ({ compactToolContexts: [] }))
     }),
     {
       name: 'endpoint-storage',
